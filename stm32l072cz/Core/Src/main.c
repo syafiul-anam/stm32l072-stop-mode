@@ -99,10 +99,14 @@ int main(void)
   MX_RTC_Init();
   /* USER CODE BEGIN 2 */
 
+  // disable the RTC wakeup
+  HAL_RTCEx_DeactivateWakeUpTimer(&hrtc);
+
   for (int i=0; i<20; i++){
 	  HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 	  HAL_Delay(200);
   }
+  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
 
   char *str = "ABOUT TO GO INTO THE STOP MODE\r\n";
   HAL_UART_Transmit(&huart4, (uint8_t *)str, strlen(str),HAL_MAX_DELAY);
@@ -111,7 +115,7 @@ int main(void)
 
   /*## Configure the Wake up timer #############################################*/
   /*	RTC Wake-up Interrupt Generation:
-   * 	Wake-up Time Base = (RTC_WAKEUPCLOCK_RTCCLK_DIV / (LSI))
+   * 	Wake-up Time Base = (RTC_WAKEUPCLOCK_RTCCLK_DIV / (LSI or LSE))
    * 	==> WakeUpCounter = Wake-up Time / Wake-up Time Base
    *
    * 	To configure the wake up timer to 10s the WakeUpCounter is set to :
@@ -145,6 +149,7 @@ int main(void)
 	  HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 	  HAL_Delay(2000);
   }
+  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
 
   char *str2 = "WAKEUP FROM STOP MODE in the MAIN LOOP\r\n";
   HAL_UART_Transmit(&huart4, (uint8_t *)str2, strlen(str2), HAL_MAX_DELAY);
@@ -175,13 +180,17 @@ void SystemClock_Config(void)
   /** Configure the main internal regulator output voltage
   */
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
+  /** Configure LSE Drive Capability
+  */
+  HAL_PWR_EnableBkUpAccess();
+  __HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_LOW);
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSE;
+  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLMUL = RCC_PLLMUL_4;
@@ -204,7 +213,7 @@ void SystemClock_Config(void)
     Error_Handler();
   }
   PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_RTC;
-  PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSI;
+  PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSE;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();
@@ -243,10 +252,10 @@ static void MX_RTC_Init(void)
   }
   /** Enable the WakeUp
   */
-//  if (HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, 0, RTC_WAKEUPCLOCK_RTCCLK_DIV16) != HAL_OK)
-//  {
-//    Error_Handler();
-//  }
+  if (HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, 0, RTC_WAKEUPCLOCK_RTCCLK_DIV16) != HAL_OK)
+  {
+    Error_Handler();
+  }
   /* USER CODE BEGIN RTC_Init 2 */
 
   sTime.Hours = 0x0;
@@ -331,6 +340,7 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
@@ -392,10 +402,10 @@ void HAL_RTCEx_WakeUpTimerEventCallback(RTC_HandleTypeDef *hrtc)
    */
 
 	SystemClock_Config();
-			HAL_ResumeTick();
+	HAL_ResumeTick();
 
-			char *str3 = "WAKEUP FROM RTC\r\n";
-			HAL_UART_Transmit(&huart4, (uint8_t *)str3, strlen(str3), HAL_MAX_DELAY);
+	char *str3 = "WAKEUP FROM RTC\r\n";
+	HAL_UART_Transmit(&huart4, (uint8_t *)str3, strlen(str3), HAL_MAX_DELAY);
 }
 
 /* USER CODE END 4 */
